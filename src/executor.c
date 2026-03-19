@@ -224,8 +224,8 @@ int execute(struct joblist *head)
         int last_status = 0;
 
         for (struct joblist *ptr = head; ptr != NULL; ptr = ptr->next) {
-                if (ptr->flags & JB_AND && !last_status) break;
-                if (ptr->flags & JB_OR  &&  last_status) break;
+                if (ptr->flags & JB_AND &&   last_status) break;
+                if (ptr->flags & JB_OR  &&  !last_status) break;
 
                 if (ptr->flags & JB_BACKGROUND) {
                         return background_execute(ptr);
