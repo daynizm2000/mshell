@@ -1,6 +1,7 @@
 #pragma once
 
 typedef struct {
+        char *res;
         char *distr;
         char *path;
         char *uname;

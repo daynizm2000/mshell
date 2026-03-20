@@ -1,7 +1,7 @@
 NAME = mshell
 
 CC = gcc
-CFLAGS = -Wall -Wextra -Werror -g
+CFLAGS = -Wall -Wextra -Werror -g -lreadline
 
 SRC = \
 main.c \

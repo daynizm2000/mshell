@@ -120,6 +120,15 @@ int prompt_init(prompt_t *prompt)
                 return -1;
         }
 
+        if (!(prompt->res = malloc(strlen(prompt->distr) + strlen(prompt->uname) + strlen(prompt->path) + 16))) {
+                free(prompt->distr);
+                free(prompt->uname);
+                free(prompt->path);
+                return -1;
+        }
+
+        sprintf(prompt->res, "%s@%s %s> ", prompt->distr, prompt->uname, prompt->path);
+
         return 0;
 }
 

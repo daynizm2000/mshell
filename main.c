@@ -9,6 +9,8 @@
 #include <fcntl.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <readline/readline.h>
+#include <readline/history.h>
 
 #define CFG_FNAME ".mshellrc"
 #define RDF_DEFCAP 4096
@@ -124,26 +126,18 @@ int main(void)
         sigaction(SIGTERM, &sa, NULL);
 
         while (mainloop_running) {
-                prompt_print(prompt);
-                fflush(stdout);
+                char *uinput = readline(prompt.res);
 
-                char *uinput = NULL;
-                size_t size = 0;
-
-                if (getline(&uinput, &size, stdin) < 0) {
-                        if (uinput) free(uinput);
-                        if (!size)  perror("mshell");
-
+                if (!uinput) {
                         break;
                 }
-
-                char *nl = strrchr(uinput, '\n');
-                if (nl) *nl = '\0';
 
                 if (strcmp(uinput, "exit") == 0) {
                         free(uinput);
                         break;
                 }
+
+                add_history(uinput);
 
                 mshell_exec(uinput);
 
