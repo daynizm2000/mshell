@@ -101,6 +101,15 @@ static char* get_path(void)
         return path;
 }
 
+static char* get_res(const prompt_t *prompt)
+{
+        char *res = malloc(strlen(prompt->distr) + strlen(prompt->uname) + strlen(prompt->path) + 16);
+        if (!res) return NULL;
+
+        sprintf(res, "%s@%s %s> ", prompt->distr, prompt->uname, prompt->path);
+        return res;
+}
+
 int prompt_init(prompt_t *prompt)
 {
         if (!prompt) return -1;
@@ -120,14 +129,12 @@ int prompt_init(prompt_t *prompt)
                 return -1;
         }
 
-        if (!(prompt->res = malloc(strlen(prompt->distr) + strlen(prompt->uname) + strlen(prompt->path) + 16))) {
+        if (!(prompt->res = get_res(prompt))) {
                 free(prompt->distr);
                 free(prompt->uname);
                 free(prompt->path);
                 return -1;
         }
-
-        sprintf(prompt->res, "%s@%s %s> ", prompt->distr, prompt->uname, prompt->path);
 
         return 0;
 }
@@ -142,6 +149,7 @@ void prompt_path_update(prompt_t *prompt)
         if (!prompt) return;
 
         prompt->path = get_path();
+        prompt->res  = get_res(prompt);
 }
 
 void prompt_free(prompt_t *prompt)
