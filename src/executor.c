@@ -212,7 +212,6 @@ static int background_execute(struct joblist *ptr)
         if (pid > 0) return 0;
 
         if (setsid() < 0) return -1;
-        chdir("/");
 
         _exit(pipeline_execute(ptr->pipe));
 }
@@ -228,7 +227,7 @@ int execute(struct joblist *head)
                 if (ptr->flags & JB_OR  &&  !last_status) break;
 
                 if (ptr->flags & JB_BACKGROUND) {
-                        return background_execute(ptr);
+                        last_status = background_execute(ptr);
                 }
                 else {
                         last_status = pipeline_execute(ptr->pipe);
