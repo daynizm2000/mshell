@@ -1,36 +1,65 @@
 # 🐚 mshell — minimal Unix shell
 
-**mshell** is a custom minimal Unix shell written in C. It supports basic shell features such as pipelines, redirections, and logical operators.
+mshell is a custom minimal Unix shell written in C for educational purposes. It implements basic Unix shell functionality including pipelines, redirections, logical operators, and simple job execution.
 
-This project is mainly for educational and experimental purposes, so bugs and unstable behavior are expected.
+⚠️ This project is experimental and may contain bugs, undefined behavior, and incomplete edge-case handling.
 
 ---
 
 ## ⚙️ Features
 
-mshell supports:
-
-- `|` — pipes  
-- `>` — redirect stdout to file  
-- `>>` — append stdout to file  
-- `<` — redirect stdin from file  
-- `&&` — logical AND  
-- `||` — logical OR  
-- `<<` — here-document (if implemented correctly)  
-- execution of external programs
-
-Additional features:
-
-- execution of `~/.mshellrc` on startup  
-- custom prompt  
-- signal handling (`SIGINT`, `SIGTERM`)  
+* `|` pipelines
+* `>` stdout redirection
+* `>>` append stdout redirection
+* `<` stdin redirection
+* `&&` logical AND execution
+* `||` logical OR execution
+* `<<` here-document support
+* background execution with `&`
+* execution of external programs
+* execution of `~/.mshellrc` on startup
+* custom dynamic prompt (`user@host path>` style)
+* basic signal handling (`SIGINT`, `SIGTERM`)
+* command history (via GNU Readline)
 
 ---
 
-## 🚀 Build & Run
+## 📦 Dependencies
+
+External libraries used:
+
+* GNU Readline (line editing, history, interactive input)
+
+### Install dependencies
+
+**Arch Linux:**
+
+```bash
+sudo pacman -S readline
+```
+
+**Debian / Ubuntu:**
+
+```bash
+sudo apt install libreadline-dev
+```
+
+---
+
+## 🧰 Build
 
 ```bash
 git clone https://github.com/daynizm2000/mshell.git
 cd mshell
 make
+```
+
+---
+
+## 🚀 Run
+
+```bash
 ./mshell
+```
+
+---
