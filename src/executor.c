@@ -185,7 +185,7 @@ static int pipeline_execute(struct pipelist *head)
                         
                         execvp(*ptr->cmd->argv, ptr->cmd->argv);
 
-                        perror("mshell");
+                        perror(*ptr->cmd->argv);
                         _exit(127);
                 }
 
