@@ -1,7 +1,4 @@
-#include "../include/joblist.h"
-#include "../include/cmd_parser.h"
-#include "../include/mshell_cmd.h"
-#include "../include/executor.h"
+#include "../include/mshell.h"
 #include <unistd.h>
 #include <stdio.h>
 #include <fcntl.h>

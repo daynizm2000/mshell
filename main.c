@@ -1,7 +1,4 @@
-#include "include/prompt.h"
-#include "include/lexer.h"
-#include "include/joblist.h"
-#include "include/executor.h"
+#include "include/mshell.h"
 #include <stdio.h>
 #include <pwd.h>
 #include <string.h>
