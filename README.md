@@ -1,4 +1,3 @@
-````md
 # mshell — minimal Unix shell
 
 mshell is a custom minimal Unix shell written in C for educational purposes. It implements core Unix shell functionality including pipelines, redirections, environment variables, logical operators, and job execution.
