@@ -12,12 +12,13 @@
 #define CFG_FNAME ".mshellrc"
 #define RDF_DEFCAP 4096
 
-volatile sig_atomic_t mainloop_running = 1;
+volatile sig_atomic_t g_mainloop_running = 1;
+struct env_map g_env_map;
 
 static void sig_handler(int sig)
 {
         if (sig == SIGTERM) {
-                mainloop_running = 0;
+                g_mainloop_running = 0;
                 kill(g_fg_pid, SIGTERM);
         }
         else if (sig == SIGINT) {
@@ -110,8 +111,27 @@ int runcfg(void)
         return mshell_exec(data);
 }
 
-int main(void)
+int environment_init(const char** const envp)
 {
+        if (env_map_init(&g_env_map) < 0) {
+                return -1;
+        }
+
+        if (env_map_copy_envp(&g_env_map, envp) < 0) {
+                env_map_destroy(&g_env_map);
+                return -1;
+        }
+
+        return 0;
+}
+
+int main(int argc __attribute__((unused)), const char** const argv __attribute__((unused)), const char** const envp) // добавитть $ и = осталось
+{
+        if (environment_init(envp) < 0) {
+                perror("mshell");
+                return 1;
+        }
+
         prompt_t prompt;
         prompt_init(&prompt);
 
@@ -122,7 +142,7 @@ int main(void)
         sigaction(SIGINT, &sa, NULL);
         sigaction(SIGTERM, &sa, NULL);
 
-        while (mainloop_running) {
+        while (g_mainloop_running) {
                 char *uinput = readline(prompt.res);
 
                 if (!uinput) {

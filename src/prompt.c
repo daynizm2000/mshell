@@ -1,4 +1,4 @@
-#include "../include/prompt.h"
+#include "../include/mshell.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>

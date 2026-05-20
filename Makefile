@@ -10,7 +10,8 @@ src/lexer.c \
 src/joblist.c \
 src/executor.c \
 src/cmd_parser.c \
-src/mshell_cmd.c
+src/mshell_cmd.c \
+src/environment.c
 
 OBJDIR = build
 

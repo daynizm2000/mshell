@@ -1,3 +1,5 @@
+#define _GNU_SOURCE
+
 #include "../include/mshell.h"
 #include <unistd.h>
 #include <stdio.h>
@@ -116,11 +118,81 @@ static int apply_redirs(cmd_t *cmd)
         return 0;
 }
 
+static const char* find_equal(const char *str)
+{
+        int in_quotes        = 0;
+        int in_double_quotes = 0;
+
+        for (const char *ptr = str; *ptr; ptr++) {
+                if (*ptr == '\'') in_quotes        = !in_quotes;
+                if (*ptr == '"')  in_double_quotes = !in_double_quotes;
+
+                if (!in_quotes && !in_double_quotes && *ptr == '=') return ptr;
+        }
+
+        return NULL;
+}
+
+static void assigment_processing(cmd_t *cmd)
+{
+        for (int i = 0; i < cmd->argc; i++) {
+                const char *arg = cmd->argv[i];
+
+                const char *sep = find_equal(arg);
+                if (!sep) break;
+
+                env_t env = {.is_exported = 0};
+
+                if (!(env.key = strndup(arg, sep - arg))) {
+                        perror("mshell");
+                        continue;
+                }
+                if (!(env.value = strdup(sep + 1))) {
+                        free(env.key);
+                        continue;
+                }
+
+                if (env_map_add(&g_env_map, &env) < 0) {
+                        perror("mshell");
+                }
+
+                free(env.key);
+                free(env.value);
+                free(cmd->argv[i]);
+
+                int count_elems_to_move = cmd->argc - i - 1;
+                
+                if (count_elems_to_move) {
+                        memmove(cmd->argv + i, cmd->argv + i + 1, count_elems_to_move * sizeof(char*));
+                }
+
+                cmd->argc--;
+                i--;
+                cmd->argv[cmd->argc] = NULL;
+        }
+}
+
+static int is_only_assigments(cmd_t *cmd)
+{
+        for (int i = 0; i < cmd->argc; i++) {
+                if (!find_equal(cmd->argv[i])) {
+                        return 0;
+                }
+        }
+
+        return 1;
+}
+
 static int pipeline_execute(struct pipelist *head)
 {
         if (!head) return -1;
 
         if (!head->next) {
+                if (is_only_assigments(head->cmd)) {
+                        assigment_processing(head->cmd);
+                        return 0;
+                }
+
                 mshell_cmd_t *builtin = mshell_findcmd(head->cmd->argv[0]);
                 
                 if (builtin) {
@@ -146,7 +218,7 @@ static int pipeline_execute(struct pipelist *head)
 
         for (struct pipelist *ptr = head; ptr != NULL; ptr = ptr->next) {
                 pid_t pid = fork();
-                g_fg_pid = pid;
+                g_fg_pid  = pid;
 
                 if (pid < 0) {
                         pipes_close(pipes, pipelist_size - 1);
@@ -168,6 +240,7 @@ static int pipeline_execute(struct pipelist *head)
 
                         pipes_close(pipes, pipelist_size - 1);
                         expand_cmd(ptr->cmd);
+                        assigment_processing(ptr->cmd);
 
                         if (apply_redirs(ptr->cmd) != 0) {
                                 perror("mshell");
@@ -179,8 +252,15 @@ static int pipeline_execute(struct pipelist *head)
                         if (builtin) {
                                 _exit(builtin->func(ptr->cmd));
                         }
+
+                        char** const envp = env_map_generate_envp(&g_env_map);
+
+                        if (!envp) {
+                                perror("mshell");
+                                _exit(127);
+                        }
                         
-                        execvp(*ptr->cmd->argv, ptr->cmd->argv);
+                        execvpe(*ptr->cmd->argv, ptr->cmd->argv, envp);
 
                         perror(*ptr->cmd->argv);
                         _exit(127);
