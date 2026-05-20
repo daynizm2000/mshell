@@ -134,7 +134,7 @@ extern struct env_map   g_env_map;
 int prompt_init(prompt_t *prompt);
 void prompt_print(prompt_t prompt);
 void prompt_path_update(prompt_t *prompt);
-void prompt_free(prompt_t *prompt);
+void prompt_destroy(prompt_t *prompt);
 
 
 

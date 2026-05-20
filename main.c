@@ -162,7 +162,7 @@ int main(int argc __attribute__((unused)), const char** const argv __attribute__
                 prompt_path_update(&prompt);
         }
 
-        prompt_free(&prompt);
+        prompt_destroy(&prompt);
 
         return 0;
 }

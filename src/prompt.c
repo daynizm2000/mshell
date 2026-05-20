@@ -4,6 +4,7 @@
 #include <string.h>
 #include <pwd.h>
 #include <unistd.h>
+#include <fcntl.h>
 #include <ctype.h>
 
 static void delete_spaces(char *str)
@@ -27,27 +28,57 @@ static void delete_spaces(char *str)
 
 static char *get_distr(void)
 {
-        FILE *f = fopen("/etc/os-release", "r");
-        if (!f) return NULL;
+        int fd = open("/etc/os-release", O_RDONLY);
+        if (fd < 0) return NULL;
 
-        char buffer[1024];
+        char buffer[4096];
+        ssize_t read_bytes     = 0;
+        size_t  total_bytes    = 0;
 
-        while (fgets(buffer, sizeof(buffer), f)) {
-                if (strncmp(buffer, "NAME=", 5) == 0) {
-                        char *ptr = (*(buffer + 6) == '\"') ? buffer + 7 : buffer + 6;
-                        
-                        size_t j = 0;
-                        while (ptr[j] != '\"' && ptr[j] != '\n') j++;
+        while ((read_bytes = read(fd, buffer + total_bytes, sizeof(buffer) - total_bytes)) > 0) {
+                if (total_bytes + read_bytes >= sizeof(buffer)) {
+                        if (total_bytes > (sizeof("NAME=") - 1)) {
+                                memmove(buffer, buffer + total_bytes - (sizeof("NAME=") - 1), sizeof("NAME=") - 1);
+                        }
 
-                        ptr[j] = '\0';
+                        total_bytes = sizeof("NAME=") - 1;
+                }
+                else {
+                        total_bytes += read_bytes;
+                }
 
-                        char *res = strdup(ptr);
+                const char *dname_field = memmem(buffer, total_bytes, "NAME=", sizeof("NAME=") - 1);
+                if (!dname_field || (dname_field != buffer && dname_field[-1] != '\n')) continue;
+
+                if (dname_field) {
+                        dname_field += sizeof("NAME=") - 1; // we shift it so that the beginning is after the '=' sign
+
+                        if (*dname_field == '"' || *dname_field == '\'') {
+                                dname_field++;
+                        }
+
+                        size_t copy_count = 0;
+
+                        while (&dname_field[copy_count] != &buffer[total_bytes] && dname_field[copy_count] != '\'' 
+                                && dname_field[copy_count] != '"' && dname_field[copy_count] != '\n') {
+                                        copy_count++;
+                                }
+
+                        char *res = strndup(dname_field, copy_count);
+
+                        if (!res) {
+                                close(fd);
+                                return NULL;
+                        }
+
                         delete_spaces(res);
-                        
+                        close(fd);
+
                         return res;
                 }
         }
 
+        close(fd);
         return NULL;
 }
 
@@ -55,73 +86,61 @@ static char *get_uname(void)
 {
         struct passwd *pwd = getpwuid(getuid());
 
-        if (pwd && pwd->pw_name) {
-                return strdup(pwd->pw_name);
-        }
-        else {
-                return NULL;
-        }
+        return (pwd && pwd->pw_name) ? strdup(pwd->pw_name) : NULL;
 }
 
-static char* _get_home_path(void)
+static char* get_home_path(void)
 {
         struct passwd *pwd = getpwuid(getuid());
 
-        if (pwd && pwd->pw_name) {
-                size_t rsize = strlen(pwd->pw_name) + 7;
-                char *res = malloc(rsize);
-                if (!res) return NULL;
+        if (!pwd || !pwd->pw_name) return NULL;
+                
+        size_t rlen = snprintf(NULL, 0, "/home/%s", pwd->pw_name);
+        char *res = malloc(rlen + 1);
+        if (!res) return NULL;
 
-                sprintf(res, "/home/%s", pwd->pw_name);
-                res[rsize] = '\0';
-
-                return res;
-        }
-        
-        return NULL;
+        sprintf(res, "/home/%s", pwd->pw_name);
+                
+        return res;
 }
+
+#define GET_PATH__GO_EXIT(ret, retval) \
+        do { \
+                ret = retval; \
+                goto cleanup; \
+        } while (0);
 
 static char* get_path(void)
 {
-        char *path = getcwd(NULL, 0);
-        if (!path) return NULL;
+        char *ret = NULL;
 
-        char *home_path = _get_home_path();
-        if (!home_path) {
-                free(path);
-                return NULL;
-        }
+        char *path = getcwd(NULL, 0);
+        if (!path) GET_PATH__GO_EXIT(ret, NULL);
+
+        char *home_path = get_home_path();
+        if (!home_path) GET_PATH__GO_EXIT(ret, NULL);
 
         size_t len_home = strlen(home_path);
 
-        if (strncmp(path, home_path, len_home) == 0 &&
-            (path[len_home] == '/' || path[len_home] == '\0')) {
+        if (strncmp(path, home_path, len_home) == 0 && (path[len_home] == '/' || path[len_home] == '\0')) {
+                if (path[len_home] == '\0') GET_PATH__GO_EXIT(ret, strdup("~"));
 
-                if (path[len_home] == '\0') {
-                        free(path);
-                        free(home_path);
-                        return strdup("~");
-                }
+                size_t newlen = snprintf(NULL, 0, "~/%s", path + len_home + 1);
+                char *res = malloc(newlen + 1);
+                if (!res) GET_PATH__GO_EXIT(ret, NULL);
 
-                char *suffix = path + len_home + 1;
-
-                size_t new_len = 1 + strlen(suffix) + 1; // "~" + "/" + suffix + '\0'
-                char *res = malloc(new_len);
-                if (!res) {
-                        free(path);
-                        free(home_path);
-                        return NULL;
-                }
-
-                sprintf(res, "~/%s", suffix);
-
-                free(path);
-                free(home_path);
-                return res;
+                sprintf(res, "~/%s", path + len_home + 1);
+                GET_PATH__GO_EXIT(ret, res);
+        }
+        else {
+                GET_PATH__GO_EXIT(ret, strdup(path));
         }
 
-        free(home_path);
-        return path;
+cleanup:
+        if (path)       free(path);
+        if (home_path)  free(home_path);
+
+        return ret;
 }
 
 static char* get_res(const prompt_t *prompt)
@@ -137,29 +156,15 @@ int prompt_init(prompt_t *prompt)
 {
         if (!prompt) return -1;
 
-        if (!(prompt->distr = get_distr())) {
-                return -1;
-        }
-
-        if (!(prompt->uname = get_uname())) {
-                free(prompt->distr);
-                return -1;
-        }
-
-        if (!(prompt->path = get_path())) {
-                free(prompt->distr);
-                free(prompt->uname);
-                return -1;
-        }
-
-        if (!(prompt->res = get_res(prompt))) {
-                free(prompt->distr);
-                free(prompt->uname);
-                free(prompt->path);
-                return -1;
-        }
+        if (!(prompt->distr = get_distr()))     goto fail;
+        if (!(prompt->uname = get_uname()))     goto fail;
+        if (!(prompt->path  = get_path()))      goto fail;
+        if (!(prompt->res   = get_res(prompt))) goto fail;
 
         return 0;
+fail:
+        prompt_destroy(prompt);
+        return -1;
 }
 
 void prompt_print(prompt_t prompt)
@@ -171,15 +176,19 @@ void prompt_path_update(prompt_t *prompt)
 {
         if (!prompt) return;
 
+        if (prompt->path) free(prompt->path);
+        if (prompt->res)  free(prompt->res);
+
         prompt->path = get_path();
         prompt->res  = get_res(prompt);
 }
 
-void prompt_free(prompt_t *prompt)
+void prompt_destroy(prompt_t *prompt)
 {
         if (!prompt) return;
 
         if (prompt->distr) free(prompt->distr);
         if (prompt->path)  free(prompt->path);
         if (prompt->uname) free(prompt->uname);
+        if (prompt->res)   free(prompt->res);
 }
