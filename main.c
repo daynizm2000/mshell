@@ -24,6 +24,14 @@ static void sig_handler(int sig)
                         kill(g_mshell_state.fg_pid, sig);
                         g_mshell_state.fg_pid = -1;
                 }
+
+                if (sig == SIGINT) {
+                        write(STDOUT_FILENO, "\n", 1);
+                        
+                        rl_on_new_line();
+                        rl_replace_line("", 0);
+                        rl_redisplay();
+                }
         }
 }
 
