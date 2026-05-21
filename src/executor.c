@@ -8,7 +8,6 @@
 #include <string.h>
 #include <stdlib.h>
 
-volatile pid_t g_fg_pid;
 
 static int pipes_init(int pipes[][2], size_t size)
 {
@@ -58,6 +57,8 @@ static int heredoc_process(const char *eof)
                         free(buff);
                         return -1;
                 }
+
+                write(pfd[1], "\n", 1);
         }
 
         free(buff);
@@ -124,8 +125,8 @@ static const char* find_equal(const char *str)
         int in_double_quotes = 0;
 
         for (const char *ptr = str; *ptr; ptr++) {
-                if (*ptr == '\'') in_quotes        = !in_quotes;
-                if (*ptr == '"')  in_double_quotes = !in_double_quotes;
+                if (*ptr == '\'' && !in_double_quotes) in_quotes        = !in_quotes;
+                if (*ptr == '"'  && !in_quotes)        in_double_quotes = !in_double_quotes;
 
                 if (!in_quotes && !in_double_quotes && *ptr == '=') return ptr;
         }
@@ -152,7 +153,7 @@ static void assigment_processing(cmd_t *cmd)
                         continue;
                 }
 
-                if (env_map_add(&g_env_map, &env) < 0) {
+                if (env_map_add(&g_mshell_state.env_map, &env) < 0) {
                         perror("mshell");
                 }
 
@@ -197,7 +198,8 @@ static int pipeline_execute(struct pipelist *head)
                 
                 if (builtin) {
                         expand_cmd(head->cmd);
-                        return builtin->func(head->cmd);
+                        g_mshell_state.last_status_code = builtin->func(head->cmd);
+                        return g_mshell_state.last_status_code;
                 }
         }
 
@@ -218,7 +220,7 @@ static int pipeline_execute(struct pipelist *head)
 
         for (struct pipelist *ptr = head; ptr != NULL; ptr = ptr->next) {
                 pid_t pid = fork();
-                g_fg_pid  = pid;
+                g_mshell_state.fg_pid  = pid;
 
                 if (pid < 0) {
                         pipes_close(pipes, pipelist_size - 1);
@@ -253,7 +255,7 @@ static int pipeline_execute(struct pipelist *head)
                                 _exit(builtin->func(ptr->cmd));
                         }
 
-                        char** const envp = env_map_generate_envp(&g_env_map);
+                        char** const envp = env_map_generate_envp(&g_mshell_state.env_map);
 
                         if (!envp) {
                                 perror("mshell");
@@ -262,6 +264,7 @@ static int pipeline_execute(struct pipelist *head)
                         
                         execvpe(*ptr->cmd->argv, ptr->cmd->argv, envp);
 
+                        free(envp);
                         perror(*ptr->cmd->argv);
                         _exit(127);
                 }
@@ -278,7 +281,9 @@ static int pipeline_execute(struct pipelist *head)
                 waitpid(pids[i], &status, 0);
         }
 
-        return (WIFEXITED(status)) ? WEXITSTATUS(status) : (WIFSIGNALED(status)) ? 128 + WTERMSIG(status) : 1;
+        g_mshell_state.last_status_code = (WIFEXITED(status)) ? WEXITSTATUS(status) : (WIFSIGNALED(status)) ? 128 + WTERMSIG(status) : 1;
+
+        return g_mshell_state.last_status_code;
 }
 
 static int background_execute(struct joblist *ptr)

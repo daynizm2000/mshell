@@ -121,8 +121,22 @@ struct env_map {
 
 
 
-extern volatile pid_t   g_fg_pid;
-extern struct env_map   g_env_map;
+struct mshell_state {
+        int             last_status_code;
+        pid_t           fg_pid;
+
+        char            *last_cd_path;
+
+        prompt_t        prompt;
+        struct env_map  env_map;
+};
+
+
+
+
+
+
+extern struct mshell_state g_mshell_state;
 
 
 
@@ -173,6 +187,9 @@ int execute(struct joblist *head);
 
 
 // cmd_parser.c
+
+char* parse_tilda(char *str);
+char* parse_variable(char *arg);
 
 int expand_cmd(cmd_t *cmd);
 

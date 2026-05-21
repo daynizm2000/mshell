@@ -6,54 +6,74 @@
 #include <stdio.h>
 
 
-void parse_tilda(cmd_t *cmd, int pos);
-void parse_variable(cmd_t *cmd, int pos);
+void expand_parse_tilda(cmd_t *cmd, int pos);
+void expand_parse_variable(cmd_t *cmd, int pos);
 
 
-static void (*g_parse_handlers[])(cmd_t*, int pos) = {
-        parse_tilda,
-        parse_variable
+void (*g_parse_handlers[])(cmd_t*, int pos) = {
+        expand_parse_tilda,
+        expand_parse_variable
 };
 
 
-void parse_tilda(cmd_t *cmd, int pos)
+char* parse_tilda(char *str)
+{
+        if (!(str[0] == '~' && (str[1] == '/' || str[1] == '\0'))) return NULL;
+
+        struct passwd *pw = getpwuid(getuid());
+        if (!pw) return NULL;
+
+        size_t fpath_size = snprintf(NULL, 0, "%s/%s", pw->pw_dir, str + 1); // 0 arg element is tilda '~'
+        char *fpath       = malloc(fpath_size + 1);
+        if (!fpath) return NULL;
+
+        sprintf(fpath, "%s/%s", pw->pw_dir,  str + 1);
+
+        return fpath;
+}
+
+char* parse_variable(char *arg)
+{
+        if (*arg != '$')  return NULL;
+
+        if (arg[1] == '?' && arg[2] == '\0') {
+                char res[11];
+                sprintf(res, "%d", g_mshell_state.last_status_code);
+
+                return strdup(res);
+        }
+
+        env_t *var = env_map_find(&g_mshell_state.env_map, arg + 1);
+
+        if (!var) {
+                return strdup("");
+        }
+
+        return strdup(var->value);
+}
+
+void expand_parse_tilda(cmd_t *cmd, int pos)
 {
         const char *arg = cmd->argv[pos];
 
         if (!cmd || !arg) return;
-        if (!(arg[0] == '~' && (arg[1] == '/' || arg[1] == '\0'))) return;
-
-        struct passwd *pw = getpwuid(getuid());
-        if (!pw) return;
-
-        size_t fpath_size = snprintf(NULL, 0, "%s/%s", pw->pw_dir, arg + 1); // 0 arg element is tilda '~'
-        char *fpath = malloc(fpath_size + 1);
+        
+        char *fpath = parse_tilda(cmd->argv[pos]);
         if (!fpath) return;
-
-        sprintf(fpath, "%s/%s", pw->pw_dir,  arg + 1);
 
         free(cmd->argv[pos]);
         cmd->argv[pos] = fpath;
 }
 
-void parse_variable(cmd_t *cmd, int pos)
+void expand_parse_variable(cmd_t *cmd, int pos)
 {
-        const char *arg = cmd->argv[pos];
-
-        if (!cmd || !arg) return;
-        if (*arg != '$')  return;
-
-        env_t *var = env_map_find(&g_env_map, arg + 1);
-
-        if (!var) {
-                free(cmd->argv[pos]);
-                cmd->argv[pos] = strdup("");
-
-                return;
-        }
+        if (!cmd || !cmd->argv[pos]) return;
+        
+        char *res = parse_variable(cmd->argv[pos]);
+        if (!res) return;
 
         free(cmd->argv[pos]);
-        cmd->argv[pos] = strdup(var->value);
+        cmd->argv[pos] = res;
 }
 
 int expand_cmd(cmd_t *cmd)

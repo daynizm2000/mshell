@@ -28,7 +28,7 @@ int mshell_cmd_export(cmd_t *cmd)
         if (!cmd) return -1;
 
         if (cmd->argc == 1) {
-                env_map_print(&g_env_map);
+                env_map_print(&g_mshell_state.env_map);
                 return 0;
         }
 
@@ -36,7 +36,7 @@ int mshell_cmd_export(cmd_t *cmd)
                 const char *sep = strchr(cmd->argv[i], '=');
 
                 if (!sep) {
-                        env_t *env = env_map_find(&g_env_map, cmd->argv[i]);
+                        env_t *env = env_map_find(&g_mshell_state.env_map, cmd->argv[i]);
                         if (!env) continue;
 
                         env->is_exported = 1;
@@ -58,7 +58,7 @@ int mshell_cmd_export(cmd_t *cmd)
                         continue;
                 }
 
-                if (env_map_add(&g_env_map, &env) < 0) {
+                if (env_map_add(&g_mshell_state.env_map, &env) < 0) {
                         perror("mshell");
                 }
 
@@ -74,7 +74,7 @@ int mshell_cmd_unset(cmd_t *cmd)
         if (!cmd) return -1;
 
         for (int i = 1; i < cmd->argc; i++) {
-                env_map_delete(&g_env_map, cmd->argv[i]);
+                env_map_delete(&g_mshell_state.env_map, cmd->argv[i]);
         }
 
         return 0;
@@ -82,7 +82,41 @@ int mshell_cmd_unset(cmd_t *cmd)
 
 int mshell_cmd_cd(cmd_t *cmd)
 {
-        if (!cmd) return -1;
+        if (!cmd || !cmd->argv[1]) return -1;
+
+        char *new_path = cmd->argv[1];
+
+        if (cmd->argv[1][0] == '-' && cmd->argv[1][1] == '\0') {
+                if (g_mshell_state.last_cd_path) {
+                        printf("%s\n", g_mshell_state.last_cd_path);
+
+                        char *fpath = parse_tilda(g_mshell_state.last_cd_path);
+
+                        if (fpath) {
+                                free(g_mshell_state.last_cd_path);
+                                g_mshell_state.last_cd_path = fpath;
+                        }
+
+                        new_path = g_mshell_state.last_cd_path;
+                }
+        }
+
+        char *last_path = strdup(g_mshell_state.prompt.path);
+        if (!last_path) return -1;
+
+        int res = chdir(new_path);
+
+        if (res < 0) {
+                free(last_path);
+                return res;
+        }
+
+        if (g_mshell_state.last_cd_path) {
+                free(g_mshell_state.last_cd_path);
+        }
+
+        g_mshell_state.last_cd_path = last_path;
+        prompt_path_update(&g_mshell_state.prompt);
         
-        return chdir(cmd->argv[1]);
+        return res;
 }

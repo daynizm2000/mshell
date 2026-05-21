@@ -12,17 +12,20 @@
 #define CFG_FNAME ".mshellrc"
 #define RDF_DEFCAP 4096
 
-volatile sig_atomic_t g_mainloop_running = 1;
-struct env_map g_env_map;
+struct mshell_state          g_mshell_state;
+static volatile sig_atomic_t g_mainloop_running = 1;
 
 static void sig_handler(int sig)
 {
         if (sig == SIGTERM) {
                 g_mainloop_running = 0;
-                kill(g_fg_pid, SIGTERM);
+                kill(g_mshell_state.fg_pid, SIGTERM);
         }
         else if (sig == SIGINT) {
-                kill(g_fg_pid, SIGINT);
+                if (g_mshell_state.fg_pid > 0) {
+                        kill(g_mshell_state.fg_pid, SIGINT);
+                        g_mshell_state.fg_pid = -1;
+                }
         }
 }
 
@@ -113,27 +116,60 @@ int runcfg(void)
 
 int environment_init(const char** const envp)
 {
-        if (env_map_init(&g_env_map) < 0) {
+        if (env_map_init(&g_mshell_state.env_map) < 0) {
                 return -1;
         }
 
-        if (env_map_copy_envp(&g_env_map, envp) < 0) {
-                env_map_destroy(&g_env_map);
+        if (env_map_copy_envp(&g_mshell_state.env_map, envp) < 0) {
+                env_map_destroy(&g_mshell_state.env_map);
                 return -1;
         }
 
         return 0;
 }
 
-int main(int argc __attribute__((unused)), const char** const argv __attribute__((unused)), const char** const envp) // добавитть $ и = осталось
+int mshell_state_init(struct mshell_state *state, const char** const envp)
 {
-        if (environment_init(envp) < 0) {
+        if (!state) return -1;
+
+        state->fg_pid           = -1;
+        state->last_status_code = 0;
+        state->last_cd_path     = NULL;
+
+        if (environment_init(envp) < 0)           goto fail;
+        if (prompt_init(&state->prompt) < 0)      goto fail;
+        if (!(state->last_cd_path = strdup("~"))) goto fail;
+
+        return 0;
+fail:
+        env_map_destroy(&state->env_map);
+        prompt_destroy(&state->prompt);
+
+        if (state->last_cd_path) free(state->last_cd_path);
+        state->last_cd_path = NULL;
+
+        return -1;
+}
+
+void mshell_state_destroy(struct mshell_state *state)
+{
+        if (!state) return;
+
+        env_map_destroy(&state->env_map);
+        prompt_destroy(&state->prompt);
+
+        if (state->last_cd_path) free(state->last_cd_path);
+        
+        state->last_status_code = 0;
+        state->fg_pid           = -1;
+}
+
+int main(int argc __attribute__((unused)), const char** const argv __attribute__((unused)), const char** const envp)
+{
+        if (mshell_state_init(&g_mshell_state, envp) < 0) {
                 perror("mshell");
                 return 1;
         }
-
-        prompt_t prompt;
-        prompt_init(&prompt);
 
         runcfg();
 
@@ -143,7 +179,7 @@ int main(int argc __attribute__((unused)), const char** const argv __attribute__
         sigaction(SIGTERM, &sa, NULL);
 
         while (g_mainloop_running) {
-                char *uinput = readline(prompt.res);
+                char *uinput = readline(g_mshell_state.prompt.res);
 
                 if (!uinput) {
                         break;
@@ -159,10 +195,9 @@ int main(int argc __attribute__((unused)), const char** const argv __attribute__
                 mshell_exec(uinput);
 
                 free(uinput);
-                prompt_path_update(&prompt);
         }
 
-        prompt_destroy(&prompt);
+        mshell_state_destroy(&g_mshell_state);
 
         return 0;
 }
