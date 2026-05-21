@@ -100,7 +100,10 @@ int runcfg(void)
         sprintf(path, "%s/%s", pw->pw_dir, CFG_FNAME);
 
         int fd = open(path, O_RDONLY);
-        if (fd < 0) return -1;
+        if (fd < 0) {
+                free(path);
+                return -1;
+        }
 
         char *data = read_file(fd);
 
