@@ -17,13 +17,11 @@ static volatile sig_atomic_t g_mainloop_running = 1;
 
 static void sig_handler(int sig)
 {
-        if (sig == SIGTERM) {
-                g_mainloop_running = 0;
-                kill(g_mshell_state.fg_pid, SIGTERM);
-        }
-        else if (sig == SIGINT) {
-                if (g_mshell_state.fg_pid > 0) {
-                        kill(g_mshell_state.fg_pid, SIGINT);
+        if (sig == SIGTERM || sig == SIGINT) {
+                if (sig == SIGTERM) g_mainloop_running = 0;
+
+                if (g_mshell_state.fg_pid >= 0) {
+                        kill(g_mshell_state.fg_pid, sig);
                         g_mshell_state.fg_pid = -1;
                 }
         }
@@ -96,7 +94,9 @@ int runcfg(void)
         struct passwd *pw = getpwuid(getuid());
         if (!pw) return -1;
 
-        char path[strlen(pw->pw_dir) + strlen(CFG_FNAME) + 2];
+        char *path = malloc(strlen(pw->pw_dir) + strlen(CFG_FNAME) + 2);
+        if (!path) return -1;
+
         sprintf(path, "%s/%s", pw->pw_dir, CFG_FNAME);
 
         int fd = open(path, O_RDONLY);
@@ -105,13 +105,19 @@ int runcfg(void)
         char *data = read_file(fd);
 
         if (!data) {
+                free(path);
                 close(fd);
                 return -1;
         }
 
         close(fd);
+        free(path);
         
-        return mshell_exec(data);
+        int res = mshell_exec(data);
+
+        free(data);
+
+        return res;
 }
 
 int environment_init(const char** const envp)
