@@ -6,7 +6,7 @@ This project is experimental and may contain bugs, undefined behavior, parser li
 
 ---
 
-## ⚙️ Features
+## Features
 
 ### Command execution
 
