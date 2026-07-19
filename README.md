@@ -2,7 +2,7 @@
 
 mshell is a custom minimal Unix shell written in C for educational purposes. It implements core Unix shell functionality including pipelines, redirections, environment variables, logical operators, and job execution.
 
-⚠️ This project is experimental and may contain bugs, undefined behavior, parser limitations, and incomplete POSIX compatibility.
+This project is experimental and may contain bugs, undefined behavior, parser limitations, and incomplete POSIX compatibility.
 
 ---
 
@@ -47,7 +47,7 @@ mshell is a custom minimal Unix shell written in C for educational purposes. It 
 
 ---
 
-## 📦 Dependencies
+## Dependencies
 
 External libraries used:
 
@@ -55,7 +55,7 @@ External libraries used:
 
 ---
 
-## 📥 Install dependencies
+## Install dependencies
 
 ### Arch Linux
 
@@ -71,7 +71,7 @@ sudo apt install libreadline-dev
 
 ---
 
-## 🧰 Build
+## Build
 
 ```bash
 git clone https://github.com/daynizm2000/mshell.git
@@ -81,7 +81,7 @@ make
 
 ---
 
-## 🚀 Run
+## Run
 
 ```bash
 ./mshell
@@ -89,7 +89,7 @@ make
 
 ---
 
-## 🧪 Example usage
+## Example usage
 
 ```sh
 echo hello | cat
@@ -119,7 +119,7 @@ sleep 10 &
 
 ---
 
-## ⚠️ Notes
+## Notes
 
 mshell is an educational project and does not aim to fully replicate POSIX shell behavior.
 
